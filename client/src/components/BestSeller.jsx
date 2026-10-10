@@ -1,9 +1,35 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import ProductCard from './ProductCard'
-import { useAppContext } from '../context/AppContext';
+import toast from 'react-hot-toast';
+import axios from 'axios';
+
 
 const BestSeller = () => {
-    const { products } = useAppContext();
+
+  const [products, setProducts] = useState([]);
+  const fetchBestSellerProducts = async () =>{
+    try {
+      const { data } = await axios.get(`/api/product/list`,{
+        params : {
+          inStock : true,
+          limit : 5
+        }
+      })
+
+      if(data.success){
+        setProducts(data.products)
+      }
+      else{
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
+
+  useEffect(()=>{
+    fetchBestSellerProducts()
+  },[])
   return (
     <div className='mt-16'>
       <p className='text-2xl md:text-3xl font-medium'>Best Sellers</p>

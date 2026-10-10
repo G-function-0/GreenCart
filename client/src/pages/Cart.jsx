@@ -4,21 +4,32 @@ import { assets, dummyAddress } from "../assets/assets";
 import toast from "react-hot-toast";
 
 const Cart = () => {
-    const {products, currency, cartItems, removeFromCart, getCartCount, updateCartItem, navigate, getCartAmount, axios, user, setCartItems} = useAppContext()
+    const { currency, cartItems, removeFromCart, getCartCount, updateCartItem, navigate, axios, user, setCartItems} = useAppContext()
     const [cartArray, setCartArray] = useState([])
     const [addresses, setAddresses] = useState([])
     const [showAddress, setShowAddress] = useState(false)
     const [selectedAddress, setSelectedAddress] = useState(null)
     const [paymentOption, setPaymentOption] = useState("COD")
 
-    const getCart = ()=>{
-        let tempArray = []
-        for(const key in cartItems){
-            const product = products.find((item)=>item._id === key)
-            product.quantity = cartItems[key]
-            tempArray.push(product)
+
+    // i have chosen here post req with a body option instead of backend based cartItems fetch from db 
+    // so that in future i can also allow guest users to store items in cart 
+    const getCart = async ()=>{
+        try {
+            const { data } = await axios.post(`/api/cart/items`, {
+                cartItems
+            })
+            if(data.success){
+                setCartArray(data.products)
+            }
+            else{
+                toast.error(data.message)
+            }
+            
+        } catch (error) {
+            toast.error(error.message);
         }
-        setCartArray(tempArray)
+
     }
 
     const getUserAddress = async ()=>{
@@ -36,6 +47,18 @@ const Cart = () => {
         } catch (error) {
             toast.error(error.message)
         }
+    }
+
+    // Get Cart Total Amount -> can reduce be used 
+    const getCartAmount = () =>{
+        let totalAmount = 0;
+        for (const items in cartItems){
+            let itemInfo = cartArray.find((product)=> product._id === items);
+            if(cartItems[items] > 0){
+                totalAmount += itemInfo.offerPrice * cartItems[items]
+            }
+        }
+        return Math.floor(totalAmount * 100) / 100;
     }
 
     const placeOrder = async ()=>{
@@ -78,12 +101,14 @@ const Cart = () => {
         }
     }
 
+    console.log(cartArray)
     useEffect(()=>{
-        if(products.length > 0 && cartItems){
+        if(cartItems){ 
             getCart()
         }
-    },[products, cartItems])
+    },[cartItems])
 
+    
 
     useEffect(()=>{
         if(user){
@@ -91,7 +116,7 @@ const Cart = () => {
         }
     },[user])
     
-    return products.length > 0 && cartItems ? (
+    return cartArray.length > 0  ? (
         <div className="flex flex-col md:flex-row mt-16">
             <div className='flex-1 max-w-4xl'>
                 <h1 className="text-3xl font-medium mb-6">
@@ -115,7 +140,7 @@ const Cart = () => {
                             <div>
                                 <p className="hidden md:block font-semibold">{product.name}</p>
                                 <div className="font-normal text-gray-500/70">
-                                    <p>Weight: <span>{product.weight || "N/A"}</span></p>
+                                    {/* <p>Weight: <span>{product.weight || "N/A"}</span></p> */}
                                     <div className='flex items-center'>
                                         <p>Qty:</p>
                                         <select onChange={e => updateCartItem(product._id, Number(e.target.value))}  value={cartItems[product._id]} className='outline-none'>
@@ -127,7 +152,7 @@ const Cart = () => {
                                 </div>
                             </div>
                         </div>
-                        <p className="text-center">{currency}{product.offerPrice * product.quantity}</p>
+                        <p className="text-center">{currency}{product.offerPrice * cartItems[product._id]}</p>
                         <button onClick={()=> removeFromCart(product._id)} className="cursor-pointer mx-auto">
                             <img src={assets.remove_icon} alt="remove" className="inline-block w-6 h-6" />
                         </button>
