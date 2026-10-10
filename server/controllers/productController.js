@@ -25,21 +25,65 @@ export const addProduct = async (req, res)=>{
     }
 }
 
-// Get Product : /api/product/list
+// Get Product : /api/product/list?page=1&limit=10
 export const productList = async (req, res)=>{
     try {
-        const products = await Product.find({})
-        res.json({success: true, products})
+        const { search, category, inStock } = req.query;
+        const limit =parseInt(req.query.limit) || 10;
+        const page = parseInt(req.query.page) || 1;
+        const skip = (page-1) * limit;
+        let filter = {};
+        if( search !== undefined  && search.trim() !== '') {
+            filter.name = { $regex : search.trim(), $options : 'i' }
+        }
+        if(category){
+            filter.category = { $regex : `${category.trim()}`, $options : 'i'};
+        }
+        if( inStock !== undefined){
+            filter.inStock = inStock === "true";
+        }
+
+        const result = await Product.aggregate([
+            { $match : filter },
+            {
+                $facet : {
+                    metadata : [{ $count : "totalCount" } ],
+                    data : [ { $skip : skip }, { $limit  : limit}]
+                }
+            }
+        ])
+        const products = result[0].data;
+        const totalCount = result[0].metadata[0]?.totalCount || 0;
+        const totalPages = Math.ceil(totalCount/limit);
+
+
+        res.json({success: true, products, 
+            pagination : {
+                page,
+                limit,
+                totalCount,
+                totalPages,
+                "hasNextPage": page < totalPages,
+                "hasPrevPage": page > 1
+            }
+        })
     } catch (error) {
         console.log(error.message);
-        res.json({ success: false, message: error.message })
+        res.json({ 
+            success: false, 
+            message: error.message,
+            products: [],
+            pagination: { 
+                page: 1, limit: 10, totalCount: 0, totalPages: 1, hasNextPage: false, hasPrevPage: false 
+            }
+         })
     }
 }
 
-// Get single Product : /api/product/id
+// Get single Product : /api/product/:id
 export const productById = async (req, res)=>{
     try {
-        const { id } = req.body
+        const id = req.params.id || '';
         const product = await Product.findById(id)
         res.json({success: true, product})
     } catch (error) {
